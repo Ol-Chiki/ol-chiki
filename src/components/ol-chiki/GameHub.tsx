@@ -1,13 +1,13 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; 
 import type { GameLevel } from '@/types/ol-chiki';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { StarRating } from '@/components/ui/star-rating';
 import TranscriptionChallenge from '@/components/ol-chiki/games/transcription-challenge';
-import { useAuth } from '@/contexts/auth-context'; // Import useAuth
+import { useAuth } from '@/contexts/supabase-auth-context'; // Updated import
 import { 
   Type, ListChecks, Lock, Play, ChevronDown, Puzzle, FilePenLine, CaseUpper,
   AudioLines, AudioWaveform, Shuffle, ALargeSmall, Milestone, CheckSquare, SquarePen,
@@ -146,7 +146,7 @@ const initialGameLevelsData: Omit<GameLevel, 'stars'>[] = [
     id: 'type-olchiki-word-from-english',
     title: 'Type Ol Chiki Word (from English)',
     description: 'See an English word, type its Ol Chiki translation.',
-    icon: Keyboard, // Changed from KeyboardMouse
+    icon: Keyboard, 
     isLocked: true,
     questionCount: 15,
     gameComponentIdentifier: 'TypeOlChikiWordFromEnglish',
@@ -216,20 +216,20 @@ const initialGameLevelsData: Omit<GameLevel, 'stars'>[] = [
   },
 ];
 
-const getLocalStorageKey = (userId: string | null | undefined) => {
+const getLocalStorageKey = (userId: string | undefined | null) => {
   return userId ? `olChikiGameLevels_${userId}` : 'olChikiGameLevels_anonymous';
 };
 
-export default function GameHub() {
-  const { user } = useAuth(); // Get user from AuthContext
+const GameHub = React.memo(function GameHub() {
+  const { user } = useAuth(); 
   const [levels, setLevels] = useState<GameLevel[]>(() => 
     initialGameLevelsData.map(level => ({...level, stars: 0}))
   );
   const [activeGameLevelId, setActiveGameLevelId] = useState<string | null>(null);
-  const [localStorageKey, setLocalStorageKey] = useState<string>(getLocalStorageKey(user?.uid));
+  const [localStorageKey, setLocalStorageKey] = useState<string>(getLocalStorageKey(user?.id));
 
   useEffect(() => {
-    setLocalStorageKey(getLocalStorageKey(user?.uid));
+    setLocalStorageKey(getLocalStorageKey(user?.id)); // Use user.id from Supabase
   }, [user]);
 
   useEffect(() => {
@@ -239,28 +239,22 @@ export default function GameHub() {
     if (storedLevelsData) {
       try {
         const storedStarsArray: Array<{ id: string; stars: number }> = JSON.parse(storedLevelsData);
-        // Merge stored stars with the initial structure.
-        // This ensures all levels defined in initialGameLevelsData are present,
-        // and their properties (like title, description, isLocked) are up-to-date.
-        // Only the 'stars' property is taken from localStorage.
         newLevelsState = initialGameLevelsData.map(initialLevel => {
           const storedLevelProgress = storedStarsArray.find(s => s.id === initialLevel.id);
           return {
-            ...initialLevel, // Use all base properties from initialGameLevelsData
+            ...initialLevel, 
             stars: storedLevelProgress ? storedLevelProgress.stars : 0,
           };
         });
       } catch (error) {
         console.error("Failed to parse game levels from localStorage for key:", localStorageKey, error);
-        // On error, fallback to initial state with 0 stars for all levels
         newLevelsState = initialGameLevelsData.map(level => ({ ...level, stars: 0 }));
       }
     } else {
-      // No stored data, use initial state with 0 stars for all levels
       newLevelsState = initialGameLevelsData.map(level => ({ ...level, stars: 0 }));
     }
     setLevels(newLevelsState);
-  }, [localStorageKey]); // Rerun when localStorageKey changes (e.g., on login/logout)
+  }, [localStorageKey]);
 
 
   const handleGameStart = (levelId: string) => {
@@ -270,7 +264,7 @@ export default function GameHub() {
     }
   };
 
-  const handleGameComplete = (levelId: string, earnedStars: number) => {
+  const handleGameComplete = useCallback((levelId: string, earnedStars: number) => {
     let newLevelsState: GameLevel[] = [];
     setLevels(prevLevels => {
       newLevelsState = prevLevels.map(level =>
@@ -287,7 +281,7 @@ export default function GameHub() {
       return newLevelsState;
     });
     setActiveGameLevelId(null); 
-  };
+  }, [localStorageKey]); 
 
   const handleExitGame = () => {
     setActiveGameLevelId(null);
@@ -317,7 +311,6 @@ export default function GameHub() {
         />
       );
     } else if (!implementedGameIdentifiers.includes(activeGame.gameComponentIdentifier) && !activeGame.isLocked) {
-      // This handles unlocked games that are not yet implemented
       return (
         <div className="p-4 md:p-6 text-center flex flex-col items-center justify-center min-h-[calc(100vh-200px)]">
           <Gamepad2 className="w-16 h-16 text-primary mb-4" />
@@ -328,7 +321,6 @@ export default function GameHub() {
         </div>
       );
     }
-    // Fallback for locked or unknown game identifiers if somehow started
     return (
       <div className="p-4 md:p-6 text-center">
         <h3 className="text-2xl font-bold mb-4 text-destructive">Error</h3>
@@ -343,29 +335,29 @@ export default function GameHub() {
       <h2 className="text-3xl font-bold mb-4 text-primary tracking-tight text-center">Game Zone Path</h2>
       <p className="text-muted-foreground mb-10 text-center">Follow the winding path to test your Ol Chiki skills!</p>
       
-      <div className="w-full max-w-xl mx-auto">
+      <div className="w-full max-w-2xl mx-auto">
         {levels.map((level, index) => (
           <React.Fragment key={level.id}>
             <div className={`flex w-full py-2.5 ${index % 2 === 0 ? 'justify-start' : 'sm:justify-end justify-center'}`}>
-              {index % 2 !== 0 && <div className="w-1/3 flex-shrink-0 hidden sm:block"></div>}
+              {index % 2 !== 0 && <div className="w-1/4 flex-shrink-0 hidden sm:block"></div>}
               
               <Card 
-                className={`w-full sm:w-2/3 shadow-lg transition-shadow duration-300 
+                className={`w-full sm:w-3/4 shadow-lg transition-shadow duration-300 
                             ${level.isLocked ? 'opacity-70 cursor-not-allowed bg-card' : 'hover:shadow-xl cursor-pointer bg-card'}`}
                 onClick={() => !level.isLocked && handleGameStart(level.id)}
                 aria-disabled={level.isLocked}
                 tabIndex={level.isLocked ? -1 : 0}
               >
-                <CardHeader className="flex flex-row items-center justify-between p-4 space-x-4">
-                  <div className="flex items-center space-x-3.5 min-w-0"> {/* min-w-0 helps with truncation */}
-                    <div className={`p-2.5 rounded-full ${level.isLocked ? 'bg-muted' : 'bg-primary/10'}`}>
-                       <level.icon className={`h-9 w-9 ${level.isLocked ? 'text-muted-foreground' : 'text-primary'}`} />
+                <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 space-x-2 sm:space-x-3">
+                  <div className="flex items-center space-x-2 sm:space-x-3.5 min-w-0"> 
+                    <div className={`p-2 sm:p-2.5 rounded-full ${level.isLocked ? 'bg-muted' : 'bg-primary/10'}`}>
+                       <level.icon className={`h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9 ${level.isLocked ? 'text-muted-foreground' : 'text-primary'}`} />
                     </div>
-                    <div className="min-w-0 flex-grow">  {/* min-w-0 helps with truncation */}
-                      <CardTitle className="text-lg font-semibold text-accent leading-tight truncate">{level.title}</CardTitle>
+                    <div className="min-w-0 flex-grow"> 
+                      <CardTitle className="text-base sm:text-lg font-semibold text-accent leading-tight truncate">{level.title}</CardTitle>
                       <CardDescription className="text-xs text-muted-foreground mt-0.5 truncate">{level.description}</CardDescription>
-                      {!level.isLocked && <StarRating rating={level.stars} size={18} className="mt-1.5"/>}
-                      {level.isLocked && <p className="text-xs text-muted-foreground mt-1.5">Locked</p>}
+                      {!level.isLocked && <StarRating rating={level.stars} size={16} className="mt-1"/>}
+                      {level.isLocked && <p className="text-xs text-muted-foreground mt-1">Locked</p>}
                     </div>
                   </div>
                   
@@ -373,27 +365,27 @@ export default function GameHub() {
                     {!level.isLocked && (
                       <Button 
                         variant="default" 
-                        size="sm" 
-                        className="h-10 w-10 p-0 rounded-full shadow-md"
+                        size="icon" 
+                        className="h-8 w-8 sm:h-9 sm:w-9 p-0 rounded-full shadow-md"
                         onClick={(e) => { e.stopPropagation(); !level.isLocked && handleGameStart(level.id); }}
                         aria-label={`Play ${level.title}`}
                       >
-                        <Play className="h-5 w-5" />
+                        <Play className="h-4 w-4 sm:h-5 sm:w-5" />
                       </Button>
                     )}
                     {level.isLocked && (
-                      <Lock className="h-7 w-7 text-muted-foreground" />
+                      <Lock className="h-6 w-6 sm:h-7 sm:w-7 text-muted-foreground" />
                     )}
                   </div>
                 </CardHeader>
               </Card>
               
-              {index % 2 === 0 && <div className="w-1/3 flex-shrink-0 hidden sm:block"></div>}
+              {index % 2 === 0 && <div className="w-1/4 flex-shrink-0 hidden sm:block"></div>}
             </div>
 
             {index < levels.length - 1 && (
-              <div className={`flex h-14 w-full items-center justify-center`}>
-                 <ChevronDown className="h-10 w-10 text-primary/40" />
+               <div className={`flex h-10 sm:h-14 w-full items-center justify-center`}>
+                 <ChevronDown className="h-8 w-8 sm:h-10 sm:w-10 text-primary/40" />
               </div>
             )}
           </React.Fragment>
@@ -401,5 +393,6 @@ export default function GameHub() {
       </div>
     </div>
   );
-}
-
+});
+GameHub.displayName = 'GameHub';
+export default GameHub;

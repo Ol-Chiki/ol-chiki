@@ -16,6 +16,7 @@ import LoadingStateManager from './LoadingStateManager'; // To display global lo
 import { GraduationCap } from 'lucide-react'; // Example icon
 import { APP_NAME } from '@/utils/constants';
 import { useRouter } from 'next/navigation';
+import AppHeader from '../layout/app-header';
 
 
 const OlChikiApp: React.FC = () => {
@@ -79,6 +80,7 @@ const OlChikiApp: React.FC = () => {
         </div>
         {/* Add any header actions if needed, e.g., settings, if not in bottom nav */}
       </header>
+      <AppHeader />
 
       <main className="flex-grow container mx-auto py-2 px-1 md:py-6 md:px-4 pb-20">
         <AuthGuard>

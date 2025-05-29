@@ -1,8 +1,6 @@
 
 'use client';
 
-// This is the new root page for the application.
-// It will set up necessary providers and render the main OlChikiApp shell.
 
 import React from 'react';
 import OlChikiApp from '@/components/ol-chiki/OlChikiApp';
