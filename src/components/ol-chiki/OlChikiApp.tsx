@@ -73,13 +73,6 @@ const OlChikiApp: React.FC = () => {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <LoadingStateManager /> {/* For global loading messages like "Authenticating..." */}
-      <header className="bg-primary text-primary-foreground p-4 shadow-md flex items-center justify-between sticky top-0 z-40 h-18">
-        <div className="flex items-center gap-1 sm:gap-2">
-          <GraduationCap className="h-6 w-6" />
-          <h1 className="text-base sm:text-xl font-bold tracking-tight leading-tight">{APP_NAME}</h1>
-        </div>
-        {/* Add any header actions if needed, e.g., settings, if not in bottom nav */}
-      </header>
       <AppHeader />
 
       <main className="flex-grow container mx-auto py-2 px-1 md:py-6 md:px-4 pb-20">
