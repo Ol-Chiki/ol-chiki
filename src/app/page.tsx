@@ -287,9 +287,6 @@ export default function OlChikiPathPage() {
           <GraduationCap className="h-6 w-6" />
           <h1 className="text-base sm:text-xl font-bold tracking-tight leading-tight">Let's Learn Ol Chiki</h1>
         </div>
-        {user && (
-           <div className="text-xs sm:text-sm hidden sm:block truncate max-w-[150px] sm:max-w-[250px]" title={user.email ?? undefined}>Logged in as: {user.email}</div>
-        )}
       </header>
 
       <main className="flex-grow container mx-auto py-2 px-1 md:py-6 md:px-4 pb-20">
