@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 60 56% 91%; /* Soft Beige */
+    --foreground: 25 30% 20%; /* Dark Brown */
+
+    --card: 60 50% 93%; /* Slightly Lighter/Different Beige for cards */
+    --card-foreground: 25 30% 20%; /* Dark Brown */
+
+    --popover: 60 50% 93%; /* Similar to card */
+    --popover-foreground: 25 30% 20%; /* Dark Brown */
+
+    --primary: 25 76% 47%; /* Earthy Orange */
+    --primary-foreground: 30 50% 95%; /* Very Light Warm Off-White */
+
+    --secondary: 60 60% 80%; /* Lighter, less saturated olive/beige for secondary elements */
+    --secondary-foreground: 60 100% 20%; /* Darker olive for text on secondary */
+
+    --muted: 60 50% 96%; /* Very light beige, almost off-white */
+    --muted-foreground: 60 30% 45%; /* Softer, mid-tone brown/gray */
+
+    --accent: 60 100% 25%; /* Muted Olive Green */
+    --accent-foreground: 60 50% 95%; /* Very Light Beige for text on accent */
+
+    --destructive: 0 70% 55%; /* Standard Red */
+    --destructive-foreground: 0 0% 100%; /* White */
+
+    --border: 60 40% 82%; /* Slightly darker/contrasting beige for borders */
+    --input: 60 40% 88%; /* Input background, similar to border */
+    --ring: 25 76% 55%; /* Brighter Orange for focus rings */
+    
+    --chart-1: 25 76% 55%; /* Primary Orange shade for charts */
+    --chart-2: 60 100% 30%; /* Accent Olive Green shade for charts */
+    --chart-3: 30 40% 60%; /* A complementary brown */
+    --chart-4: 60 50% 70%; /* A lighter olive/beige */
+    --chart-5: 20 60% 65%; /* Another earthy tone */
+
+    --radius: 0.5rem;
+
+    /* Sidebar specific colors, can be adjusted if sidebar is heavily used */
+    --sidebar-background: 60 56% 88%; /* Slightly darker beige for sidebar bg */
+    --sidebar-foreground: 25 30% 15%; /* Darker brown for sidebar text */
+    --sidebar-primary: 25 76% 47%; /* Earthy Orange */
+    --sidebar-primary-foreground: 30 50% 95%; /* Very Light Warm Off-White */
+    --sidebar-accent: 60 100% 25%; /* Muted Olive Green */
+    --sidebar-accent-foreground: 60 50% 95%; /* Very Light Beige */
+    --sidebar-border: 60 40% 78%;
+    --sidebar-ring: 25 76% 55%;
+  }
+
+  .dark {
+    /* A basic dark theme derivation, can be further customized */
+    --background: 25 10% 15%; /* Dark Brownish Gray */
+    --foreground: 60 30% 85%; /* Light Beige/Gray */
+
+    --card: 25 10% 20%; /* Darker Brownish Gray for cards */
+    --card-foreground: 60 30% 85%;
+
+    --popover: 25 10% 20%;
+    --popover-foreground: 60 30% 85%;
+
+    --primary: 25 70% 55%; /* Earthy Orange (slightly brighter for dark mode) */
+    --primary-foreground: 25 20% 10%; /* Dark Brown for text on orange */
+
+    --secondary: 60 50% 30%; /* Dark Olive Green */
+    --secondary-foreground: 60 40% 80%; /* Light Olive/Beige text */
+
+    --muted: 25 10% 25%; /* Darker Muted Brownish Gray */
+    --muted-foreground: 60 30% 65%; /* Lighter Muted Beige/Gray */
+
+    --accent: 60 80% 35%; /* Muted Olive Green (slightly brighter for dark mode) */
+    --accent-foreground: 60 20% 90%; /* Light Beige text on accent */
+
+    --destructive: 0 60% 50%; 
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 25 10% 28%;
+    --input: 25 10% 28%;
+    --ring: 25 70% 60%;
+
+    --chart-1: 25 70% 60%;
+    --chart-2: 60 80% 40%;
+    --chart-3: 30 30% 50%;
+    --chart-4: 60 40% 60%;
+    --chart-5: 20 50% 55%;
+
+    --sidebar-background: 25 10% 12%;
+    --sidebar-foreground: 60 30% 80%;
+    --sidebar-primary: 25 70% 55%;
+    --sidebar-primary-foreground: 25 20% 10%;
+    --sidebar-accent: 60 80% 35%;
+    --sidebar-accent-foreground: 60 20% 90%;
+    --sidebar-border: 25 10% 25%;
+    --sidebar-ring: 25 70% 60%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
