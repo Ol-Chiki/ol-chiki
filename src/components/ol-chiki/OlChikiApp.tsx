@@ -12,7 +12,7 @@ import ContentRenderer from './ContentRenderer';
 import BottomNavigation from '@/components/layout/bottom-navigation';
 import LoadingStateManager from './LoadingStateManager';
 import AppHeader from '@/components/layout/app-header';
-import AppFooter from '@/components/layout/app-footer'; // New import
+import AppFooter from '@/components/layout/app-footer';
 import { useRouter } from 'next/navigation';
 
 
@@ -79,7 +79,7 @@ const OlChikiApp: React.FC = () => {
         currentUser={user} // Pass current user for dynamic profile label
       />
 
-      <AppFooter /> {/* Use the new AppFooter component */}
+      <AppFooter /> 
     </div>
   );
 };
