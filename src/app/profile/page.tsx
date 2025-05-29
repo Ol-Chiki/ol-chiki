@@ -9,7 +9,7 @@ export default function ProfilePageEntry() {
   // It can handle route-level loading/error boundaries if needed,
   // but most logic is delegated to ProfileApp.
   return (
-    // Using a global error boundary or you can create one specific for the profile section.
+    
     <ErrorBoundary fallbackMessage="The profile page encountered an error.">
       <ProfileApp />
     </ErrorBoundary>

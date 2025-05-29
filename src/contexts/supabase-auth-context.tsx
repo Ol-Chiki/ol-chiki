@@ -1,20 +1,22 @@
 
 'use client';
 
-import type { AuthUser, Session, User, UserCredentials } from '@supabase/supabase-js';
+import type { AuthUser, Session, User as SupabaseAuthUserType, UserCredentials } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthStore } from '@/stores/authStore'; // Import the new Zustand store
+import type { User as AppUser } from '@/types/auth'; // Import your app's User type
 
 // Supabase User object might contain user_metadata for custom fields like displayName
-export interface SupabaseUser extends User {
+export interface SupabaseUser extends SupabaseAuthUserType {
   user_metadata: {
     display_name?: string;
     avatar_url?: string;
-    picture?: string; // Common for OAuth providers like Google
-    full_name?: string; // Common from Google
-    name?: string; // Also common from Google
+    picture?: string; // Often used by Google
+    full_name?: string; // Often used by Google
+    name?: string; // Sometimes used by Google
     date_of_birth?: string;
     city?: string;
     state?: string;
@@ -22,7 +24,9 @@ export interface SupabaseUser extends User {
   };
 }
 
-interface AuthContextType {
+// The old context type, kept for reference during transition if other parts of app still use it.
+// Ideally, this context will be deprecated and removed.
+interface LegacyAuthContextType {
   user: SupabaseUser | null;
   session: Session | null;
   loading: boolean;
@@ -37,252 +41,185 @@ interface AuthContextType {
   updateUserProfilePhoto: (photoURL: string) => Promise<{ user: SupabaseUser | null; error: any }>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const LegacyAuthContext = createContext<LegacyAuthContextType | undefined>(undefined);
 
 export const SupabaseAuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [hasSkippedAuth, setHasSkippedAuth] = useState(false);
-  const router = useRouter();
   const { toast } = useToast();
+  const router = useRouter();
+  
+  // Get actions from the Zustand store
+  const { _setUserAndSession, setLoading: setStoreLoading, checkAuthStatus } = useAuthStore();
+
+  // These states are now primarily for the LegacyAuthContext, if still used.
+  // The Zustand store is the new source of truth.
+  const [legacyUser, setLegacyUser] = useState<SupabaseUser | null>(null);
+  const [legacySession, setLegacySession] = useState<Session | null>(null);
+  const [legacyLoading, setLegacyLoading] = useState(true);
+
 
   useEffect(() => {
-    const storedSkipStatus = typeof window !== 'undefined' ? localStorage.getItem('hasSkippedAuth') : null;
-    if (storedSkipStatus === 'true') {
-      setHasSkippedAuth(true);
-    }
+    setStoreLoading(true); // Signal store that we are checking initial status
+    checkAuthStatus(); // Initialize skip status from localStorage via store
 
-    const getSession = async () => {
-      const { data: { session: currentSession }, error } = await supabase.auth.getSession();
-      if (error) {
-        console.error('Error getting session:', error);
-        setLoading(false);
-        return;
-      }
-      setSession(currentSession);
-      setUser(currentSession?.user as SupabaseUser ?? null);
-      setLoading(false);
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const supabaseUser = session?.user as SupabaseUser ?? null;
+      let updatedUserForStore = supabaseUser;
 
-      if (currentSession?.user) {
-        localStorage.removeItem('hasSkippedAuth');
-        setHasSkippedAuth(false);
-      }
-    }
-    getSession();
+      if (_event === 'SIGNED_IN' && supabaseUser) {
+        let currentDisplayName = supabaseUser.user_metadata?.display_name;
+        let metadataNeedsUpdate = false;
+        let newMetadata = { ...supabaseUser.user_metadata };
 
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
-      setSession(newSession);
-      const newUser = newSession?.user as SupabaseUser ?? null;
-      setUser(newUser);
-
-      if (_event === 'SIGNED_IN' && newUser) {
-        toast({ title: 'Signed in successfully!', description: `Welcome ${newUser.user_metadata?.display_name || newUser.email}!` });
-        router.push('/'); 
-        // Attempt to set display_name from Google profile if not already set
-        if (!newUser.user_metadata?.display_name) {
-          const googleName = newUser.user_metadata?.full_name || newUser.user_metadata?.name;
+        if (!currentDisplayName) {
+          const googleName = supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name;
           if (googleName) {
-            try {
-              const { data: updatedUserData, error: updateError } = await supabase.auth.updateUser({
-                data: { display_name: googleName }
-              });
-              if (updateError) {
-                console.warn('Failed to update display_name from Google profile post-signin:', updateError.message);
-              } else if (updatedUserData.user) {
-                setUser(updatedUserData.user as SupabaseUser); // Update local user state immediately
-              }
-            } catch (e) {
-              console.warn('Error during attempt to update display_name post-Google sign-in:', e);
-            }
+            newMetadata.display_name = googleName;
+            metadataNeedsUpdate = true;
           }
         }
+        
+        // This is more of a conceptual placeholder. In a real app, this data should be set
+        // during the OAuth signup flow or profile completion, not assumed from generic user_metadata.
+        // For now, we are just illustrating that user_metadata can hold these.
+        // If these fields are populated by Google OAuth scopes, they'd be in user_metadata.
+        // if (!newMetadata.date_of_birth && supabaseUser.user_metadata?.birthdate) { /* hypothetical */ }
+
+
+        if (metadataNeedsUpdate) {
+          try {
+            const { data: updatedUserData, error: updateError } = await supabase.auth.updateUser({
+              data: newMetadata
+            });
+            if (updateError) {
+              console.warn('Failed to update user_metadata post-signin:', updateError.message);
+            } else if (updatedUserData.user) {
+               updatedUserForStore = updatedUserData.user as SupabaseUser;
+            }
+          } catch (e) {
+            console.warn('Error during attempt to update user_metadata post-Google sign-in:', e);
+          }
+        }
+        // Use the potentially updated user for store and legacy context
+        _setUserAndSession({ ...session, user: updatedUserForStore } as Session);
+        setLegacySession({ ...session, user: updatedUserForStore } as Session);
+        setLegacyUser(updatedUserForStore);
+
+        toast({ title: 'Signed in successfully!', description: `Welcome ${updatedUserForStore?.user_metadata?.display_name || updatedUserForStore?.email}!` });
+        // router.push('/'); // Redirection is now handled by AuthContainer or individual pages based on authStore.isAuthenticated
+      
       } else if (_event === 'SIGNED_OUT') {
-        // Toast and redirect handled by explicit logOut function
+        _setUserAndSession(null);
+        setLegacySession(null);
+        setLegacyUser(null);
+        // Toast and redirect for sign out is handled by useAuthentication hook or store's signOut action
+      } else if (session) { // For other events like USER_UPDATED, TOKEN_REFRESHED
+        _setUserAndSession(session);
+        setLegacySession(session);
+        setLegacyUser(session?.user as SupabaseUser ?? null);
+      } else { // If session is null for other reasons
+        _setUserAndSession(null);
+        setLegacySession(null);
+        setLegacyUser(null);
       }
 
-
-      setLoading(false);
-      if (newSession?.user) {
-        localStorage.removeItem('hasSkippedAuth');
-        setHasSkippedAuth(false);
-      }
+      setStoreLoading(false);
+      setLegacyLoading(false);
+    });
+    
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      _setUserAndSession(session);
+      setLegacySession(session);
+      setLegacyUser(session?.user as SupabaseUser ?? null);
+      setStoreLoading(false);
+      setLegacyLoading(false);
     });
 
     return () => {
       authListener?.subscription.unsubscribe();
     };
-  }, [router, toast]);
+  }, [_setUserAndSession, setStoreLoading, toast, checkAuthStatus, router]);
 
 
-  const signInWithGoogle = async () => {
-    setLoading(true);
-    // Ensure window.location.origin is used for redirectTo, which is standard for client-side.
-    // The `redirectTo` is where Supabase redirects the user *after* Google auth & Supabase callback.
-    // For a 403 error from Google, the issue is likely not this `redirectTo`, but the
-    // "Authorized redirect URIs" in your Google Cloud Console for your OAuth client ID,
-    // which MUST include your Supabase project's callback URL:
-    // e.g., https://<YOUR_PROJECT_REF>.supabase.co/auth/v1/callback
-    // Also, check your OAuth Consent Screen settings in Google Cloud Console.
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
-      }
-    });
-    setLoading(false);
-    if (error) {
-      console.error('Google sign-in error:', error);
-      if (error.message.includes('Popup closed by user') || error.message.includes('popup_closed_by_user')) {
-        toast({ title: 'Sign-In Cancelled', description: 'Google Sign-In was cancelled or the pop-up was closed.', variant: 'default' });
-      } else if (error.message.includes('Access denied') || error.message.includes('popup_blocked_by_browser') || (error as any).code === 'popup_blocked' || (error as any).code === 'auth/popup-blocked') {
-        toast({ title: 'Pop-up Blocked', description: 'Google Sign-In pop-up was blocked. Please disable your pop-up blocker and try again.', variant: 'destructive' });
-      } else if (error.message.includes('403')) {
-         toast({ title: 'Google Sign-In Error (403)', description: "Access denied by Google. Please ensure your Google Cloud OAuth client ID and Supabase settings (especially Redirect URIs) are correctly configured.", variant: 'destructive' });
-      }
-      else {
-        toast({ title: 'Google Sign-In Error', description: error.message || 'Failed to sign in with Google.', variant: 'destructive' });
-      }
-    }
-    return { error };
+  // --- Legacy Context Provider Values ---
+  // These methods now largely delegate to the store or authService, or are becoming obsolete
+  // For the purpose of this refactor, they remain to avoid breaking other parts of the app
+  // that might still be using the old useAuth() hook.
+  const legacySignInWithGoogle = async () => {
+    // This should ideally be called via useAuthStore().signInWithGoogle() from the UI
+    console.warn("Legacy signInWithGoogle called from context. Prefer using authStore.");
+    useAuthStore.getState().signInWithGoogle(); // Call store action
+    return { error: null }; // Placeholder return
   };
 
-  const signUpWithEmail = async (email: string, pass: string, displayName: string, dob: string, city?: string, stateName?: string) => {
-    setLoading(true);
-    if (!displayName || !dob) {
-      toast({ title: 'Missing Information', description: 'Display Name and Date of Birth are required.', variant: 'destructive' });
-      setLoading(false);
-      return { user: null, session: null, error: { message: 'Display Name and DOB required.'} as any };
-    }
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password: pass,
-      options: {
-        data: {
-          display_name: displayName,
-          date_of_birth: dob,
-          city: city || null,
-          state: stateName || null,
-        }
-      }
-    });
-    setLoading(false);
-    if (error) {
-      console.error('Email sign-up error:', error);
-      toast({ title: 'Email Sign-Up Error', description: error.message || 'Failed to sign up.', variant: 'destructive' });
-    } else if (data.user) {
-      if (data.session && data.user) { 
-         // onAuthStateChange handles the "SIGNED_IN" event
-      } else { 
-        toast({ title: 'Sign-Up Successful!', description: `Welcome ${displayName}! Please check your email to verify your account.` });
-      }
-    }
-    return { user: data.user as SupabaseUser, session: data.session, error };
+  const legacySignUpWithEmail = async (email: string, pass: string, displayName: string, dob: string, city?: string, stateName?: string) => {
+    console.warn("Legacy signUpWithEmail called from context. Prefer using authStore.");
+    // This is complex, as the store's signUpWithEmail takes a data object.
+    // For simplicity, this legacy function is now less functional.
+    const signUpData = { email, password: pass, displayName, dob, city: city || '', state: stateName || '', confirmPassword: pass };
+    useAuthStore.getState().signUpWithEmail(signUpData);
+    return { user: null, session: null, error: null }; // Placeholder
   };
-
-  const signInWithEmail = async (email: string, pass: string) => {
-    setLoading(true);
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password: pass,
-    });
-    setLoading(false);
-    if (error) {
-      console.error('Email sign-in error:', error);
-      toast({ title: 'Email Sign-In Error', description: error.message || 'Failed to sign in.', variant: 'destructive' });
-    }
-    // onAuthStateChange handles "SIGNED_IN"
-    return { user: data.user as SupabaseUser, session: data.session, error };
-  };
-
-  const logOut = async () => {
-    setLoading(true);
-    const { error } = await supabase.auth.signOut();
-    setLoading(false);
-    if (error) {
-      console.error('Sign out error:', error);
-      toast({ title: 'Sign Out Error', description: error.message || 'Failed to sign out.', variant: 'destructive' });
-    } else {
-      setUser(null);
-      setSession(null);
-      toast({ title: 'Signed out', description: 'You have been signed out.' });
-      router.push('/auth');
-    }
-    return { error };
-  };
-
-  const skipAuth = () => {
-    if (typeof window !== 'undefined') localStorage.setItem('hasSkippedAuth', 'true');
-    setHasSkippedAuth(true);
-    router.push('/');
-  };
-
-  const clearSkipAuth = () => {
-    if (typeof window !== 'undefined') localStorage.removeItem('hasSkippedAuth');
-    setHasSkippedAuth(false);
+  // ... other legacy methods would also be placeholders or call store actions ...
+  const legacySignOut = async () => {
+    useAuthStore.getState().signOut();
+    return { error: null };
   }
 
-  const updateUserDisplayName = async (displayName: string) => {
-    if (!user) return { user: null, error: { message: 'User not authenticated' } as any };
-    setLoading(true);
-    const { data, error } = await supabase.auth.updateUser({
-      data: { display_name: displayName }
-    });
-    setLoading(false);
-    if (error) {
-      toast({ title: 'Update Error', description: error.message || 'Failed to update display name.', variant: 'destructive' });
-    } else if (data.user) {
-      setUser(data.user as SupabaseUser);
-      toast({ title: 'Success', description: 'Display name updated.' });
-    }
-    return { user: data.user as SupabaseUser, error };
-  };
-
-  const updateUserProfilePhoto = async (photoURL: string) => {
-    if (!user) return { user: null, error: { message: 'User not authenticated' } as any};
-    setLoading(true);
-    // Placeholder: Actual upload to Supabase Storage would happen before this.
-    // This function would typically be called with the public URL from Supabase Storage.
-    const { data, error } = await supabase.auth.updateUser({
-      data: { avatar_url: photoURL } // Supabase often uses avatar_url for profile pictures
-    });
-    setLoading(false);
-    if (error) {
-      console.error('Error updating profile photo:', error);
-      toast({ title: 'Photo Update Error', description: error.message || 'Failed to update photo.', variant: 'destructive' });
-    } else if (data.user) {
-      setUser(data.user as SupabaseUser);
-      toast({ title: 'Profile Photo Updated', description: 'Your new profile photo has been set.' });
-    }
-    return { user: data.user as SupabaseUser, error };
+  const legacyContextValue: LegacyAuthContextType = {
+    user: legacyUser,
+    session: legacySession,
+    loading: legacyLoading,
+    signInWithGoogle: legacySignInWithGoogle,
+    signUpWithEmail: legacySignUpWithEmail,
+    signInWithEmail: async (email, password) => { 
+        useAuthStore.getState().signInWithEmail(email, password); 
+        return { user: null, session: null, error: null }; 
+    },
+    logOut: legacySignOut,
+    hasSkippedAuth: useAuthStore.getState().hasSkippedAuth, // Get from store
+    skipAuth: () => useAuthStore.getState().skipAuth(),
+    clearSkipAuth: () => { /* This logic is handled internally by store on login */},
+    updateUserDisplayName: async (displayName: string) => {
+        const { data, error } = await supabase.auth.updateUser({ data: { display_name: displayName }});
+        if (data.user) _setUserAndSession({ ...legacySession, user: data.user } as Session); // Update store
+        return { user: data.user as SupabaseUser, error };
+    },
+    updateUserProfilePhoto: async (photoURL: string) => {
+        const { data, error } = await supabase.auth.updateUser({ data: { avatar_url: photoURL }});
+        if (data.user) _setUserAndSession({ ...legacySession, user: data.user } as Session); // Update store
+        return { user: data.user as SupabaseUser, error };
+    },
   };
 
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      session,
-      loading,
-      signInWithGoogle,
-      signUpWithEmail,
-      signInWithEmail,
-      logOut,
-      hasSkippedAuth,
-      skipAuth,
-      clearSkipAuth,
-      updateUserDisplayName,
-      updateUserProfilePhoto
-    }}>
+    <LegacyAuthContext.Provider value={legacyContextValue}>
       {children}
-    </AuthContext.Provider>
+    </LegacyAuthContext.Provider>
   );
 };
 
+// This hook should ideally be deprecated and components should use useAuthStore
 export const useAuth = () => {
-  const context = useContext(AuthContext);
+  const context = useContext(LegacyAuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within a SupabaseAuthProvider');
+    // This error might occur if a component using the old useAuth() is rendered outside SupabaseAuthProvider
+    // For the new auth system, components should import useAuthStore directly.
+    console.warn('Legacy useAuth context is undefined. Ensure SupabaseAuthProvider is correctly wrapping your app. New components should prefer useAuthStore.');
+    // Return a fallback to prevent outright crashing, but functionality will be limited.
+    return {
+        user: null, session: null, loading: true, 
+        signInWithGoogle: () => Promise.resolve({error:null}),
+        signUpWithEmail: () => Promise.resolve({user:null, session:null, error:null}),
+        signInWithEmail: () => Promise.resolve({user:null, session:null, error:null}),
+        logOut: () => Promise.resolve({error:null}), 
+        hasSkippedAuth: false, 
+        skipAuth: () => {}, 
+        clearSkipAuth: () => {},
+        updateUserDisplayName: () => Promise.resolve({user:null, error:null}),
+        updateUserProfilePhoto: () => Promise.resolve({user:null, error:null})
+    } as LegacyAuthContextType;
   }
   return context;
 };
