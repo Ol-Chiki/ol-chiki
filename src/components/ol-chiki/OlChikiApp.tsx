@@ -5,28 +5,24 @@ import React, { useEffect } from 'react';
 import { useUIStore } from '@/stores/uiStore';
 import { useAuthStore } from '@/stores/authStore';
 import { useNavigationStore } from '@/stores/navigationStore';
-import { useStoreActions } from '@/hooks/useStoreActions'; // For combined actions
 
-import SplashScreen from '@/components/splash-screen'; // Assuming this component exists and is refactored
+import SplashScreen from '@/components/splash-screen';
 import AuthGuard from './AuthGuard';
 import ContentRenderer from './ContentRenderer';
 import BottomNavigation from '@/components/layout/bottom-navigation';
-import LoadingStateManager from './LoadingStateManager'; // To display global loading messages
-
-import { GraduationCap } from 'lucide-react'; // Example icon
-import { APP_NAME } from '@/utils/constants';
+import LoadingStateManager from './LoadingStateManager';
+import AppHeader from '@/components/layout/app-header';
+import AppFooter from '@/components/layout/app-footer'; // New import
 import { useRouter } from 'next/navigation';
-import AppHeader from '../layout/app-header';
 
 
 const OlChikiApp: React.FC = () => {
   const {
     isClient,
     splashSeenThisSession,
-    currentYear,
     setClientReady,
     setSplashSeen,
-    checkSplashStatus, // Action from UIStore
+    checkSplashStatus,
     setCurrentYear,
   } = useUIStore();
 
@@ -37,19 +33,17 @@ const OlChikiApp: React.FC = () => {
 
   useEffect(() => {
     setClientReady();
-    checkSplashStatus(); // Check session storage for splash status
-    checkAuthStatus(); // Check local storage for auth skip status
+    checkSplashStatus(); 
+    checkAuthStatus(); 
     setCurrentYear(new Date().getFullYear().toString());
   }, [setClientReady, checkSplashStatus, checkAuthStatus, setCurrentYear]);
 
 
   if (!isClient) {
-    // Render a minimal server-side or pre-hydration loader
-    // This helps prevent hydration mismatches if splash logic is client-heavy
     return (
        <div className="flex min-h-screen flex-col items-center justify-center bg-background">
-         <GraduationCap className="h-16 w-16 text-primary animate-pulse" />
-         <p className="mt-4 text-lg text-muted-foreground">Initializing {APP_NAME}...</p>
+         {/* Minimal server-side loader, can be enhanced */}
+         <p className="mt-4 text-lg text-muted-foreground">Initializing App...</p>
        </div>
      );
   }
@@ -57,9 +51,6 @@ const OlChikiApp: React.FC = () => {
   if (!splashSeenThisSession) {
     return <SplashScreen onComplete={() => {
       setSplashSeen();
-      // After splash, if not authenticated and not skipped, AuthGuard will redirect.
-      // Otherwise, if auth is resolved, normal app flow continues.
-      // Default to basic-hub after splash if auth allows.
       if (useAuthStore.getState().user || useAuthStore.getState().hasSkippedAuth) {
         setActiveView('basic-hub');
       }
@@ -72,7 +63,7 @@ const OlChikiApp: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <LoadingStateManager /> {/* For global loading messages like "Authenticating..." */}
+      <LoadingStateManager />
       <AppHeader />
 
       <main className="flex-grow container mx-auto py-2 px-1 md:py-6 md:px-4 pb-20">
@@ -83,14 +74,12 @@ const OlChikiApp: React.FC = () => {
 
       <BottomNavigation
         activeView={activeView}
-        onNavChange={setActiveView}
-        onProfileClick={handleProfileNavigation}
-        currentUser={user}
+        onNavChange={setActiveView} // This will be handled by navigationConfig actions
+        onProfileClick={handleProfileNavigation} // Direct navigation
+        currentUser={user} // Pass current user for dynamic profile label
       />
 
-      <footer className="bg-secondary text-secondary-foreground p-4 text-center text-sm mt-auto">
-        <p>&copy; {currentYear} {APP_NAME}. Learn and explore the Ol Chiki script.</p>
-      </footer>
+      <AppFooter /> {/* Use the new AppFooter component */}
     </div>
   );
 };
