@@ -2,8 +2,8 @@
 import type {Metadata} from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
-import { SupabaseAuthProvider } from '@/contexts/supabase-auth-context'; // Updated import
-import { Toaster } from "@/components/ui/toaster"; 
+import { SupabaseAuthProvider } from '@/contexts/supabase-auth-context';
+import { Toaster } from "@/components/ui/toaster";
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -27,13 +27,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body 
+      <body
         className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}
-        suppressHydrationWarning={true} 
+        suppressHydrationWarning={true}
       >
-        <SupabaseAuthProvider> {/* Updated Provider */}
+        <SupabaseAuthProvider>
           {children}
-          <Toaster /> 
+          <Toaster />
         </SupabaseAuthProvider>
       </body>
     </html>

@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { NavigationState, NavigationActions, ActiveView } from '@/types/stores';
+import { MAX_HISTORY_LENGTH } from '@/utils/constants';
 
 const initialState: NavigationState = {
   activeView: 'splash', // Start with splash
@@ -9,20 +10,24 @@ const initialState: NavigationState = {
   navigationHistory: ['splash'],
 };
 
-export const useNavigationStore = create<NavigationState & NavigationActions>()(
+export const useNavigationStore = create<NavigationStore>()(
   persist(
     (set, get) => ({
       ...initialState,
       setActiveView: (view) => {
         if (view !== get().activeView) {
-          get().pushHistory(view);
-          set({ activeView: view });
+          const currentHistory = get().navigationHistory;
+          let newHistory = [...currentHistory, view];
+          if (newHistory.length > MAX_HISTORY_LENGTH) {
+            newHistory = newHistory.slice(-MAX_HISTORY_LENGTH);
+          }
+          set({ activeView: view, navigationHistory: newHistory });
         }
       },
       setQuizSetNumber: (number) => set({ currentQuizSetNumber: number }),
       navigateToQuiz: (quizNumber, targetView) => {
-        get().pushHistory(targetView);
-        set({ currentQuizSetNumber: quizNumber, activeView: targetView });
+        get().setActiveView(targetView); // This will handle history
+        set({ currentQuizSetNumber: quizNumber });
       },
       goBack: () => {
         const history = get().navigationHistory;
@@ -31,24 +36,33 @@ export const useNavigationStore = create<NavigationState & NavigationActions>()(
           newHistory.pop(); // Remove current view
           const previousView = newHistory[newHistory.length - 1];
           set({ activeView: previousView, navigationHistory: newHistory });
+        } else if (history.length === 1 && history[0] !== 'basic-hub') {
+          // If only one item in history and it's not the main hub, go to main hub
+          set({ activeView: 'basic-hub', navigationHistory: ['basic-hub'] });
         }
       },
-      pushHistory: (view) => {
+      pushHistory: (view) => { // Exposed if direct manipulation is needed, but setActiveView handles it
         set((state) => {
-          const newHistory = [...state.navigationHistory, view];
-          // Limit history size if needed, e.g., to 10
-          return { navigationHistory: newHistory.slice(-10) };
+          const currentHistory = state.navigationHistory;
+          let newHistory = [...currentHistory, view];
+          if (newHistory.length > MAX_HISTORY_LENGTH) {
+            newHistory = newHistory.slice(-MAX_HISTORY_LENGTH);
+          }
+          return { navigationHistory: newHistory };
         });
       },
       resetNavigation: () => {
-        set(initialState);
-        get().pushHistory('splash'); // Ensure splash is initial after reset
+         set({ activeView: 'basic-hub', navigationHistory: ['basic-hub'], currentQuizSetNumber: null });
       }
     }),
     {
-      name: 'ol-chiki-navigation-storage',
-      storage: createJSONStorage(() => sessionStorage), // or localStorage
-      partialize: (state) => ({ activeView: state.activeView, currentQuizSetNumber: state.currentQuizSetNumber }), // Persist only specific parts
+      name: 'ol-chiki-navigation-storage-v2', // New key to avoid conflicts with old structure
+      storage: createJSONStorage(() => sessionStorage),
+      partialize: (state) => ({
+        activeView: state.activeView,
+        currentQuizSetNumber: state.currentQuizSetNumber,
+        navigationHistory: state.navigationHistory,
+      }),
     }
   )
 );

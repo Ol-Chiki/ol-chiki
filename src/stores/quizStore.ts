@@ -1,32 +1,28 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { QuizState, QuizActions, QuizQuestion, QuizResult } from '@/types/stores';
+import type { QuizState, QuizActions, QuizQuestionData, QuizResultData } from '@/types/stores';
+import { QUIZ_RESULTS_STORAGE_KEY_PREFIX } from '@/utils/constants';
 
 const initialState: QuizState = {
   currentQuizId: null,
-  currentQuizData: null,
+  currentQuizQuestions: null,
   currentQuestionIndex: 0,
   userAnswers: {},
-  quizResults: {},
+  quizResults: {}, // Key will be like 'reading-basic-identify-words_set1_USERID'
   quizProgress: {},
 };
 
-const getStorageKey = (base: string, userId?: string | null) => {
-  return `${base}_${userId || 'anonymous'}`;
-}
-
-export const useQuizStore = create<QuizState & QuizActions>()(
+export const useQuizStore = create<QuizStore>()(
   persist(
     (set, get) => ({
       ...initialState,
       startQuiz: (quizId, questions) => {
         set({
           currentQuizId: quizId,
-          currentQuizData: questions,
+          currentQuizQuestions: questions,
           currentQuestionIndex: 0,
           userAnswers: {},
-          appLoadingMessage: null, // from UIStore if it were combined or accessed via custom hook
         });
       },
       answerQuestion: (questionId, answer) => {
@@ -35,75 +31,78 @@ export const useQuizStore = create<QuizState & QuizActions>()(
         }));
       },
       nextQuestion: () => {
-        set((state) => ({
-          currentQuestionIndex: Math.min(
-            state.currentQuestionIndex + 1,
-            (state.currentQuizData?.length || 1) -1
-          ),
-        }));
+        set((state) => {
+          const currentQuestions = state.currentQuizQuestions;
+          if (currentQuestions && state.currentQuestionIndex < currentQuestions.length - 1) {
+            return { currentQuestionIndex: state.currentQuestionIndex + 1 };
+          }
+          return {}; // No change if already at the last question or no questions
+        });
       },
-      setQuizData: (quizId, data) => {
-        // This might be used if quiz data is fetched asynchronously
-        set({ currentQuizData: data, currentQuizId: quizId });
+      setQuizData: (quizId, data) => { // Could be used if questions are fetched async
+        set({ currentQuizQuestions: data, currentQuizId: quizId });
       },
-      saveQuizResult: (quizId, result) => {
-        // Here, quizId should be the full identifier like "reading-basic-identify-words_set1"
+      saveQuizResult: (result: QuizResultData) => {
+        // The result.quizId should already be user-specific if needed
+        // e.g. result.quizId = `reading-basic-identify-words_set1_${userId}`
+        // The quizStore itself doesn't need to know about userId here, the caller forms the quizId.
         set((state) => ({
-          quizResults: { ...state.quizResults, [quizId]: result },
-          currentQuizId: null, // Reset current quiz after saving
-          currentQuizData: null,
+          quizResults: { ...state.quizResults, [result.quizType + '_' + (result.quizSetNumber || 'global')]: result },
+          currentQuizId: null,
+          currentQuizQuestions: null,
           currentQuestionIndex: 0,
           userAnswers: {},
         }));
-        // Persist to localStorage directly (Zustand persist middleware handles the main state)
-        // The key for localStorage should include userId
-        // This part of the logic is more complex and typically involves getting userId from authStore
-        // For simplicity in this example, we'll assume quizId already contains user context if needed
-        // or it's handled by a wrapper action.
-        // Example: if (typeof window !== 'undefined') {
-        //   const userSpecificKey = getStorageKey(`quizResult_${quizId}`, authStore.getState().user?.id);
-        //   localStorage.setItem(userSpecificKey, JSON.stringify(result));
-        // }
       },
       updateProgress: (quizId, progress) => {
         set((state) => ({
           quizProgress: { ...state.quizProgress, [quizId]: progress },
         }));
       },
-      resetQuizState: (quizId) => {
-        if (quizId) {
-          set((state) => ({
-            quizResults: { ...state.quizResults, [quizId]: undefined! }, // Clearing specific result
-            quizProgress: { ...state.quizProgress, [quizId]: 0 },
-            // Reset current quiz if it matches
-            currentQuizId: state.currentQuizId === quizId ? null : state.currentQuizId,
-            currentQuizData: state.currentQuizId === quizId ? null : state.currentQuizData,
-            currentQuestionIndex: state.currentQuizId === quizId ? 0 : state.currentQuestionIndex,
-            userAnswers: state.currentQuizId === quizId ? {} : state.userAnswers,
-          }));
-        } else {
-          set(initialState); // Reset all quiz states
+      resetQuizState: (quizIdToReset?: string) => {
+        if (quizIdToReset) {
+          set((state) => {
+            const newResults = { ...state.quizResults };
+            delete newResults[quizIdToReset];
+            const newProgress = { ...state.quizProgress };
+            delete newProgress[quizIdToReset];
+            return {
+              quizResults: newResults,
+              quizProgress: newProgress,
+              currentQuizId: state.currentQuizId === quizIdToReset ? null : state.currentQuizId,
+              currentQuizQuestions: state.currentQuizId === quizIdToReset ? null : state.currentQuizQuestions,
+              currentQuestionIndex: state.currentQuizId === quizIdToReset ? 0 : state.currentQuestionIndex,
+              userAnswers: state.currentQuizId === quizIdToReset ? {} : state.userAnswers,
+            };
+          });
+        } else { // Reset all
+          set({
+            currentQuizId: null,
+            currentQuizQuestions: null,
+            currentQuestionIndex: 0,
+            userAnswers: {},
+            // quizResults and quizProgress are persisted, so they are not reset here unless explicitly needed.
+            // If a full reset of persisted results is needed, that's a different action.
+          });
         }
       },
       loadResultsForUser: (userId: string) => {
-        // This would be more complex, iterating over known quiz types/levels
-        // and constructing localStorage keys to load all relevant results.
-        // For now, this is a placeholder.
-        // Example: if (typeof window !== 'undefined') {
-        //   const loadedResults = {};
-        //   // ... logic to load from localStorage based on userId ...
-        //   set({ quizResults: loadedResults });
-        // }
+        // This is a conceptual placeholder.
+        // In a real app, you might iterate through known quiz types/levels,
+        // construct localStorage keys using QUIZ_RESULTS_STORAGE_KEY_PREFIX + userId + quizSpecificId,
+        // and populate the quizResults state.
+        // For now, the persist middleware handles loading the entire quizResults object.
+        // This function can be enhanced if specific per-user loading logic from localStorage is needed
+        // outside of what the persist middleware does.
       }
     }),
     {
-      name: 'ol-chiki-quiz-storage', // General key for Zustand's own persistence of its state
+      name: 'ol-chiki-quiz-storage-v2',
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({ // Persist results and progress
-        quizResults: state.quizResults,
-        quizProgress: state.quizProgress,
+      partialize: (state) => ({
+        quizResults: state.quizResults, // Persist results
+        quizProgress: state.quizProgress // Persist progress
       }),
     }
   )
 );
-

@@ -1,16 +1,19 @@
 
 import type { LucideIcon } from 'lucide-react';
-import type { AllStores } from './stores'; // Will be created
+import type { AllStores } from './stores'; // Updated import path if needed
 
-// Re-defining ActiveView based on current app structure and future needs
+// Re-defining ActiveView for the new architecture
 export type ActiveView =
-  | 'splash' // New implicit view for splash screen
-  | 'auth' // For the /auth page
+  | 'splash'        // Initial screen
+  | 'loading'       // Generic loading state for async operations
+  | 'auth'          // Authentication page /auth
+  | 'profile'       // Profile page /profile
+  | 'error'         // Generic error display view
   | 'basic-hub'
   | 'alphabet'
   | 'numbers'
   | 'words'
-  | 'sentence' // Santad AI / Sentence Practice
+  | 'sentence'      // Santad AI / Sentence Practice
   | 'practice-hub'
   // Reading
   | 'reading-practice-hub'
@@ -38,24 +41,22 @@ export type ActiveView =
   | 'writing-quiz-hard'
   | 'writing-expert-selection-hub'
   | 'writing-quiz-expert'
-  | 'game'
-  | 'profile' // For the /profile page
-  | 'loading' // Generic loading view
-  | 'error'; // Generic error view
+  | 'game';
 
 export interface NavItemConfig {
-  id: string; // Could be an ActiveView or a special action like 'logout'
+  id: string; // Should map to an ActiveView for main sections
   label: string;
   icon: LucideIcon;
-  action: (stores: AllStores) => void; // Action to dispatch or navigation to trigger
-  isActive?: (activeView: ActiveView, stores: AllStores) => boolean;
+  action: (stores: AllStores) => void;
+  isActive?: (activeView: ActiveView, stores: AllStores) => boolean; // activeView from navigationStore
   isVisible?: (stores: AllStores) => boolean;
 }
 
 // For component registry
 export interface ComponentConfig {
-  component: () => Promise<{ default: React.ComponentType<any> }>; // Allow any props for now
-  preload?: boolean;
-  storeActions?: (stores: AllStores, params?: any) => void; // Actions to call on load
-  fallback?: React.ComponentType;
+  component: () => Promise<{ default: React.ComponentType<any> }>; // For React.lazy
+  preload?: boolean; // For future use with more advanced preloading
+  storeActions?: (stores: AllStores, params?: any) => void; // Actions to dispatch on load/mount
+  fallback?: React.ComponentType<any>; // Specific fallback for this component
+  requiresAuth?: boolean; // If true, AuthGuard will protect it
 }
