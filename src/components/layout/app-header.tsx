@@ -8,7 +8,6 @@ export default function AppHeader(){
           <GraduationCap className="h-6 w-6" />
           <h1 className="text-base sm:text-xl font-bold tracking-tight leading-tight">{APP_NAME}</h1>
         </div>
-        {/* Add any header actions if needed, e.g., settings, if not in bottom nav */}
       </header>
     )
 }
